@@ -132,8 +132,8 @@ mov [length],ecx
 xor ecx,ecx
 mov esi,[boundedBy]
 AD1_:
-mov al,[PREVIOUS_STATUS + ecx] ; 
-mov [esi+ecx*2],al
+mov ax,[PREVIOUS_STATUS + ecx*2] ; 
+mov [esi+ecx*2],ax
 inc ecx
 cmp ecx,[length]
 jl AD1_
@@ -157,8 +157,8 @@ mov [length],ecx
 xor ecx,ecx
 mov esi,[boundedBy]
 AD_:
-mov al,[esi+ecx*2]
-mov [PREVIOUS_STATUS + ecx],al
+mov ax,[esi+ecx*2]
+mov [PREVIOUS_STATUS + ecx*2],ax
 inc ecx
 cmp ecx,[length]
 jl AD_
