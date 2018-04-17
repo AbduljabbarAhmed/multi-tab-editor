@@ -13,7 +13,6 @@ int 0x13
 jmp START
 
 
-
 times (510 - ($ - $$)) db 0
 db 0x55, 0xAA
 START:
@@ -444,17 +443,27 @@ test byte[STATUS],0x04 ; SHADED
 jz LM6
 call RemoveShading
 LM6:
-thisOne:
-cmp byte[edi],0
-je checkAgain
-add edi,2
+
+
+
 xor edx,edx
 mov eax,edi
+mov cl,[PageNumber]
+and ecx,0xFF
+sub eax,[limits+ecx*4]
 mov ecx,0xA0
 div ecx
-cmp edx,0x9E
+sub edi , edx
+add edi , 0x9E
+iiiii:
+cmp byte[edi-2], 0
+jne ppppp
+sub edi , 2
+jmp iiiii
+ppppp:
+jmp checkAgain
+
 je checkAgain
-jmp thisOne
 CTRL2:
 cmp al,0x1D
 je ctrl
@@ -476,35 +485,14 @@ BKSP:
 cmp al,0x0E ; BKSP
 jne TAB
 test byte[STATUS],0x04 ; SHADED
-jz LMEA2
+jz ree
 call DeleteFirst
 jmp checkAgain
-LMEA2:
-mov cl,[PageNumber]
-and ecx,0xFF
-cmp edi,[limits+ecx*4]
-je checkAgain
-mov ebp,edi
-HA:
-mov dx,[edi]
-mov [edi-2],dx
-add edi,2
-cmp dl,0
-jne HA
-mov edi,ebp
-sub edi,2
-cmp byte[edi-2],0
-jne checkAgain
-mov eax,edi
-mov cl,[PageNumber]
-and ecx,0xFF
-sub eax,[limits+ecx*4]
-mov ecx,160
-xor edx,edx
-div ecx
-cmp edx,0
-je checkAgain
-jmp LMEA2
+ree:
+call backSpace
+jmp checkAgain
+
+
 TAB:
 cmp al,0x0F ; tab ******
 jne ENTR
@@ -957,6 +945,40 @@ mov [edi],ax
 inc edi
 inc edi
 ret
+
+backSpace:
+LMEA2:
+mov cl,[PageNumber]
+and ecx,0xFF
+cmp edi,[limits+ecx*4]
+je che
+mov ebp,edi
+HA:
+mov dx,[edi]
+mov [edi-2],dx
+add edi,2
+cmp dl,0
+jne HA
+mov edi,ebp
+sub edi,2
+cmp byte[edi-2],0
+jne che
+
+
+mov eax,edi
+mov cl,[PageNumber]
+and ecx,0xFF
+sub eax,[limits+ecx*4]
+mov ecx,160
+xor edx,edx
+div ecx
+cmp edx,0
+je che
+jmp LMEA2
+che:
+
+ret
+
 
 changeColor:
 mov eax,[boundedBy]
