@@ -489,7 +489,9 @@ jz ree
 call DeleteFirst
 jmp checkAgain
 ree:
+
 call backSpace
+
 jmp checkAgain
 
 
@@ -714,7 +716,9 @@ print:
 test byte[STATUS],0x04 ; shaded
 jz AMHB
 and byte[STATUS],0xFB
+push eax
 call DeleteFirst
+pop eax
 mov [edi],al
 add edi,2
 jmp checkAgain
@@ -729,19 +733,32 @@ mov edi,[boundedBy+4]
 mov ecx,edi
 sub ecx,esi
 shr ecx,1
+arj:
+mov al,[esi]
+cmp al,0
+jne vcv
+dec ecx
+vcv:
+mov eax,esi
+mov dl,[PageNumber]
+and edx,0xFF
+sub eax,[limits+edx*4]
+xor edx,edx
+mov ebp, 160
+div ebp
+cmp edx,0
+jne vvc
+inc ecx
+vvc:
+add esi,2
+cmp esi,edi
+jle arj
 OuterLp:
-mov ebp,edi
-cloop:
-mov dl,[edi]
-mov [edi-2],dl
-mov byte[edi-1],0x0F
-add edi,2
-cmp dl,0
-jne cloop
-mov edi,ebp
-sub edi,2
+push ecx
+call backSpace
+pop ecx
 loop OuterLp
-and byte[STATUS],0xFB
+and byte[STATUS],0xFB ; shaded
 ret
 
 RemoveShading:
@@ -778,10 +795,13 @@ in al,0x60
 LEFTSH:
 cmp al,0x4B ; Left Arrow
 jne RIGHTSH
+call LSH
+jmp checkAgain
+LSH:
 mov cl,[PageNumber]
 and ecx,0xFF
 cmp edi,[limits+ecx*4]
-je checkAgain
+je cdc
 thisAgain:
 sub edi,2
 cmp byte[edi],0
@@ -799,20 +819,29 @@ cmp edi,[boundedBy+4]
 jne VV
 VW:
 and byte[STATUS],0xFB ; reset
-jmp checkAgain
+jmp cdc
 VV:
 or byte[STATUS],0x04 ; set
 call SetColor
-jmp checkAgain
+cdc:
+ret
+
+
 RIGHTSH:
 cmp al,0x4D ; Right Arrow
 jne UPSH
+;cmp byte[edi],0
+;je checkAgain
+call RSH
+jmp checkAgain
+
+RSH:
 mov cl,[PageNumber]
 and ecx,0xFF
 mov ebp,[limits+ecx*4]
 add ebp,0xFA0
 cmp edi,ebp
-je checkAgain
+je chec
 call SetColor
 add edi,2
 cmp edi,[boundedBy+4]
@@ -827,75 +856,60 @@ cmp edi,[boundedBy]
 jne VVc
 VVc2:
 and byte[STATUS],0xFB ; reset
-jmp checkAgain
+ret
 VVc:
 or byte[STATUS],0x04 ; set
-jmp checkAgain
+chec:
+ret
+
+
 UPSH:
 cmp al,0x48 ; up
 jne DOWNSH
-cmp byte[edi-1],0x3F
-jne contin
-mov ecx,0x50
-sub edi,2
-mov edx,2
-jmp LABEL
-contin:
-mov ecx,0x50 ;
-xor edx,edx
-LABEL:
-call SetColor
-sub edi,2
-loop LABEL
-add edi,edx
-cmp edi,[boundedBy]
-jle CCC
-mov [boundedBy+4],edi
-cmp edi,[boundedBy]
-jne VVe
-je VVe2
-CCC:
-mov [boundedBy],edi
-cmp edi,[boundedBy+4]
-jne VVe
-VVe2:
-and byte[STATUS],0xFB ; reset
+mov ecx,80
+plp2:
+push ecx
+cmp byte[edi-2],0
+je eee2
+call LSH
+pop ecx
+loop plp2
 jmp checkAgain
-VVe:
-or byte[STATUS],0x04 ; set
+eee2:
+sub edi,2
+pop ecx
+loop plp2
+
+agag2:
+add edi,2
+cmp byte[edi],0
+je agag2
+
 jmp checkAgain
 DOWNSH:
 cmp al,0x50 ;down
 jne checkAgain
-cmp byte[edi+3],0x3F
-jne contin2
-mov ecx,0x50
-add edi,2
-mov edx,2
-jmp LABEL2
-contin2:
-mov ecx,0x50 ;
-xor edx,edx
-LABEL2:
-call SetColor
-add edi,2
-loop LABEL2
-sub edi,edx
-cmp edi,[boundedBy+4]
-jge DDD
-mov [boundedBy],edi
-cmp edi,[boundedBy+4]
-jne VVw
-je VVw2
-DDD:
-mov [boundedBy+4],edi
-cmp edi,[boundedBy]
-jne VVw
-VVw2:
-and byte[STATUS],0xFB ; reset
+mov ecx,80
+plp:
+push ecx
+cmp byte[edi],0
+je eee
+call RSH
+pop ecx
+loop plp
 jmp checkAgain
-VVw:
-or byte[STATUS],0x04 ; set
+eee:
+add edi,2
+pop ecx
+loop plp
+
+agag:
+
+cmp byte[edi],0
+jne checkAgain
+sub edi,2
+jmp agag
+
 jmp checkAgain
 
 PAGEDOWN:
@@ -927,6 +941,7 @@ and byte[edi+1],0x0F
 ret
 
 Insert: ;AL in EDI
+
 mov ebp,edi
 mov dl,[edi]
 mov dh,[edi+1]
@@ -947,22 +962,47 @@ inc edi
 ret
 
 backSpace:
-LMEA2:
+
 mov cl,[PageNumber]
 and ecx,0xFF
 cmp edi,[limits+ecx*4]
-je che
+jnl d1
+ret
+ d1:
+mov eax,edi
+sub eax,[limits+ecx*4]
+mov ecx,160
+xor edx,edx
+div ecx
+cmp edx,0
+je specialCase
+
 mov ebp,edi
-HA:
+HH:
 mov dx,[edi]
 mov [edi-2],dx
 add edi,2
 cmp dl,0
-jne HA
+jne HH
+mov edi,ebp
+sub edi,2
+ret
+specialCase:
+mov cl,[PageNumber]
+and ecx,0xFF
+cmp edi,[limits+ecx*4]
+je end1
+mov ebp,edi
+AHT:
+mov dx,[edi]
+mov [edi-2],dx
+add edi,2
+cmp dl,0
+jne AHT
 mov edi,ebp
 sub edi,2
 cmp byte[edi-2],0
-jne che
+jne end1
 
 
 mov eax,edi
@@ -973,11 +1013,31 @@ mov ecx,160
 xor edx,edx
 div ecx
 cmp edx,0
-je che
-jmp LMEA2
-che:
+je end1
+jmp specialCase
+end1:
+mov esi,edi
+mov cl,[PageNumber]
+and ecx,0xFF
+mov ebp,[limits+ecx*4]
+mov eax,esi
+sub eax,ebp
+mov ecx,160
+xor edx,edx
+div ecx
+add esi,edx
+add ebp,0xF00
+
+Mst:
+mov al,[esi+160]
+mov [esi],al
+add esi,2
+cmp esi,ebp
+jl Mst
 
 ret
+
+
 
 
 changeColor:
@@ -1031,6 +1091,22 @@ AD:
 mov ax,[esi+ecx*2]
 and ah,0x0F ; remove shade
 mov [MyMemory + ecx*2],ax
+mov dl,[PageNumber]
+and edx,0xFF
+lea eax,[esi+ecx*2]
+sub eax,[limits+edx*4]
+mov ebp,0x9E
+xor edx,edx
+div ebp
+cmp edx,0
+jne contm
+mov al,0x13 ; newLine
+;;; debugging
+mov ah,0x0F
+inc ecx
+mov [MyMemory + ecx*2],ax
+;add dword[length],1
+contm:
 inc ecx
 cmp ecx,[length]
 jl AD
@@ -1042,10 +1118,31 @@ PASTE:
 
 xor ecx,ecx
 AD2:
+
 mov ax,[MyMemory + ecx*2]
+cmp al,0
+je vcx
+cmp al,0x13 ; new line
+jne dsd
+push ecx
+mov cl,[PageNumber]
+and ecx,0xFF
+mov eax,edi
+sub eax,[limits+ecx*4]
+xor edx,edx
+mov ecx,160
+div ecx
+sub edx,160
+neg edx
+add edi,edx
+pop ecx
+jmp vcx
+dsd:
 push ecx
 call Insert
 pop ecx
+vcx:
+
 inc ecx
 cmp ecx,[length]
 jl AD2
@@ -1053,6 +1150,7 @@ ret
 PageNumber: db 0
 address: dd 0xB8000,0xB9000,0xBA000,0xBB000,0xBC000,0xBD000,0xBE000,0xBF000
 limits: dd 0xB8000,0xB9000,0xBA000,0xBB000,0xBC000,0xBD000,0xBE000,0xBF000
+enttr: db 0
 ScanCodeTable:   db "//1234567890-=//qwertyuiop[]//asdfghjkl;'`/\zxcvbnm,.//// /"
 ScanCodeTableSH: db '//!@#$%^&*()_+//QWERTYUIOP{}//ASDFGHJKL:"~/|ZXCVBNM<>?/// /' 
 STATUS: db 0 ; X _ X _ X _ ALT _ CTRL _ SHADED _ CapsL _ NumL 
