@@ -243,7 +243,7 @@ je checkAgain
 cmp byte[edi],0
 je checkAgain
 jmp A1_Loop
-
+;; 
 norm1:
 call right
 jmp checkAgain
