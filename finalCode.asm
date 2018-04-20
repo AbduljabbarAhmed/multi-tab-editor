@@ -752,7 +752,7 @@ inc ecx
 vvc:
 add esi,2
 cmp esi,edi
-jle arj
+jl arj
 OuterLp:
 push ecx
 call backSpace
@@ -959,6 +959,37 @@ mov edi,ebp
 mov [edi],ax
 inc edi
 inc edi
+push edi
+ther:
+mov eax,edi
+mov cl,[PageNumber]
+and ecx,0xFF
+sub eax,[limits+ecx*4]
+mov ecx,160
+xor edx,edx
+div ecx
+sub edx,160
+sub edi,edx
+cmp byte[edi],0
+je rtrr
+cmp byte[edi-2],0
+je rtrr
+cmp byte[edi],0x20
+je rtrr
+cmp byte[edi-2],0x20
+je rtrr
+asa:
+sub edi,2
+cmp byte[edi-2],0x20
+jne asa
+mov AL,' '
+mov AH,0x0F
+call Insert
+jmp ther
+
+
+rtrr:
+pop edi
 ret
 
 backSpace:
@@ -966,7 +997,7 @@ backSpace:
 mov cl,[PageNumber]
 and ecx,0xFF
 cmp edi,[limits+ecx*4]
-jnl d1
+jg d1
 ret
  d1:
 mov eax,edi
@@ -986,6 +1017,8 @@ cmp dl,0
 jne HH
 mov edi,ebp
 sub edi,2
+;;;;;
+;;;;;
 ret
 specialCase:
 mov cl,[PageNumber]
@@ -1029,8 +1062,8 @@ add esi,edx
 add ebp,0xF00
 
 Mst:
-mov al,[esi+160]
-mov [esi],al
+mov ax,[esi+160]
+mov [esi],ax
 add esi,2
 cmp esi,ebp
 jl Mst
@@ -1095,17 +1128,17 @@ mov dl,[PageNumber]
 and edx,0xFF
 lea eax,[esi+ecx*2]
 sub eax,[limits+edx*4]
-mov ebp,0x9E
+mov ebp,0xA0
 xor edx,edx
 div ebp
-cmp edx,0
+cmp edx,0x9e
 jne contm
 mov al,0x13 ; newLine
-;;; debugging
 mov ah,0x0F
 inc ecx
+sub esi,2
 mov [MyMemory + ecx*2],ax
-;add dword[length],1
+add dword[length],1
 contm:
 inc ecx
 cmp ecx,[length]
@@ -1136,6 +1169,7 @@ sub edx,160
 neg edx
 add edi,edx
 pop ecx
+
 jmp vcx
 dsd:
 push ecx
