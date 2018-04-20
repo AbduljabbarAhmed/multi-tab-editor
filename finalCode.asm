@@ -1058,7 +1058,8 @@ sub eax,ebp
 mov ecx,160
 xor edx,edx
 div ecx
-add esi,edx
+neg edx
+sub esi,edx
 add ebp,0xF00
 
 Mst:
