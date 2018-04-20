@@ -59,110 +59,17 @@ jmp checkAgain
 
 CTRLBR:
 cmp al,0x9D
-jne JBR
+jne SHIFT
 ctrlbr:
 and byte[STATUS],0xF7 ; reset
 jmp checkAgain
 
-JBR:
-test byte[STATUS],0x08 ; check control status
-jz SHIFT ; continue
-;here when Control_Is_Pressed
-cmp al,0x2E ; C
-jne con2
-test byte[STATUS],0x04 ; check shaded string
-jz checkAgain
-call COPY
-jmp checkAgain
-con2:
-cmp al,0x2F ; V
-jne con3
-test byte[STATUS],0x04 ; check shaded string
-jz jmpthere
-call DeleteFirst
-jmpthere:
-call PASTE
-jmp checkAgain
 
-con3:
-cmp al,0x2D ; X
-jne con4
-test byte[STATUS],0x04 ; check shaded string
-jz checkAgain
-call COPY
-call DeleteFirst
-jmp checkAgain
 
-con4:
-cmp AL , 0x1E ; A
-jne con5
-mov cl,[PageNumber]
-and ecx,0xFF
-mov edi,[limits+ecx*4]
-mov [boundedBy],edi
-CTRLA:
-cmp byte[edi],0
-je OVERCOME
-or byte[edi+1],0x30 ; 0011 0000
-OVERCOME:
-add edi,2   
-mov ebp,[limits+ecx*4]  
-add ebp,0xFA0        
-cmp edi,ebp
-jle CTRLA
-LP_1:
-sub edi,2
-cmp byte[edi-2],0
-je LP_1
-mov [boundedBy+4],edi
-or byte[STATUS],0x04 ; set shaded status
-jmp checkAgain
-con5:
-cmp al,0x2C ; Z
-jne con6
-mov cl,[PageNumber]
-and ecx,0xFF
-mov edi,[limits+ecx*4]
-mov [boundedBy],edi
-add edi,0xFA0
-mov [boundedBy+4],edi
-mov ecx,25*80
-mov [length],ecx
-xor ecx,ecx
-mov esi,[boundedBy]
-AD1_:
-mov ax,[PREVIOUS_STATUS + ecx*2] ; 
-mov [esi+ecx*2],ax
-inc ecx
-cmp ecx,[length]
-jl AD1_
-LP_2:
-sub edi,2
-cmp byte[edi-2],0
-je LP_2
-jmp checkAgain
-con6:
-cmp al,0x1F ; S
-jne checkAgain
-push edi
-mov cl,[PageNumber]
-and ecx,0xFF
-mov edi,[limits+ecx*4]
-mov [boundedBy],edi
-add edi,0xFA0
-mov [boundedBy+4],edi
-mov ecx,25*80
-mov [length],ecx
-xor ecx,ecx
-mov esi,[boundedBy]
-AD_:
-mov ax,[esi+ecx*2]
-mov [PREVIOUS_STATUS + ecx*2],ax
-inc ecx
-cmp ecx,[length]
-jl AD_
-pop edi
-jmp checkAgain
+
+
+
+
 SHIFT:
 cmp al,0x2A ; LSH make
 je shift
@@ -258,17 +165,39 @@ je SHADE
 LEFT:
 cmp al,0x4B ; Left Arrow
 jne RIGHT
+test byte[STATUS],0x08 ; control
+jz norm
+A2_Loop:
+call left
+mov cl,[PageNumber]
+and ecx,0xFF
+cmp edi,[limits+ecx*4]
+je checkAgain
+cmp byte[edi-2],0x20
+je checkAgain
+cmp byte[edi-2],','
+je checkAgain
+cmp byte[edi-2],';'
+je checkAgain
+cmp byte[edi-2],':'
+je checkAgain
+jmp A2_Loop
+norm:
+call left
+jmp checkAgain
+
+
 left:
 test byte[STATUS],0x04 ; SHADED
 jz LM1
 call RemoveShading
 mov edi,[boundedBy]
-jmp checkAgain
+jmp checkAg
 LM1:
 mov cl,[PageNumber]
 and ecx,0xFF
 cmp edi,[limits+ecx*4]
-je checkAgain
+je checkAg
 mov eax,edi
 sub eax,[limits+ecx*4]
 mov ecx,160
@@ -286,36 +215,56 @@ mov ecx,160
 xor edx,edx
 div ecx
 cmp edx,0
-je bbb
+je checkAg
 cmp byte[edi-2],0
 je RepeatThat
-bbb:
-jmp checkAgain
-
+checkAg:
+ret
 
 NotFirst:
 sub edi,2
-jmp checkAgain
+jmp checkAg
 RIGHT:
 cmp al,0x4D ; Right Arrow
 jne UP
+test byte[STATUS],0x08 ; control
+jz norm1
+
+A1_Loop:
+call right
+cmp byte[edi],0x20
+je checkAgain
+cmp byte[edi],','
+je checkAgain
+cmp byte[edi],';'
+je checkAgain
+cmp byte[edi],':'
+je checkAgain
+cmp byte[edi],0
+je checkAgain
+jmp A1_Loop
+
+norm1:
+call right
+jmp checkAgain
+
 right:
 test byte[STATUS],0x04 ; SHADED
 jz LM2
 call RemoveShading
 mov edi,[boundedBy+4]
-jmp checkAgain
+jmp checkA
 LM2:
 mov cl,[PageNumber]
 and ecx,0xFF
 mov ebp,[limits+ecx*4]
 add ebp,0xFA0
 cmp edi,ebp
-je checkAgain
+je checkA
 cmp byte[edi],0
 je nextline
 add edi,2
-jmp checkAgain
+jmp checkA
 nextline:
 xor edx,edx
 mov eax,edi
@@ -327,9 +276,12 @@ div ecx
 sub edx,0xA0
 neg edx
 cmp byte[edi+edx],0
-je checkAgain
+je checkA
 add edi,edx
-jmp checkAgain
+checkA:
+ret
+
+
 UP:
 cmp al,0x48 ; up
 jne DOWN
@@ -618,7 +570,10 @@ NEXT6:
 cmp al,0x4B
 jne NEXT7
 test byte[STATUS],0x01
-jz left
+jnz lef
+call left
+jmp checkAgain
+lef:
 mov AL,'4'
 jmp print
 NEXT7:
@@ -632,7 +587,10 @@ NEXT8:
 cmp al,0x4D
 jne NEXT9
 test byte[STATUS],0x01
-jz right
+jnz rig
+call right
+jmp checkAgain
+rig:
 mov AL,'6'
 jmp print
 NEXT9:
@@ -697,6 +655,109 @@ CHARS:
 
 cmp al,0x80
 jnb checkAgain
+;;
+
+JBR:
+test byte[STATUS],0x08 ; check control status
+jz SHI ; continue
+;here when Control_Is_Pressed
+cmp al,0x2E ; C
+jne con2
+test byte[STATUS],0x04 ; check shaded string
+jz checkAgain
+call COPY
+jmp checkAgain
+con2:
+cmp al,0x2F ; V
+jne con3
+test byte[STATUS],0x04 ; check shaded string
+jz jmpthere
+call DeleteFirst
+jmpthere:
+call PASTE
+jmp checkAgain
+
+con3:
+cmp al,0x2D ; X
+jne con4
+test byte[STATUS],0x04 ; check shaded string
+jz checkAgain
+call COPY
+call DeleteFirst
+jmp checkAgain
+
+con4:
+cmp AL , 0x1E ; A
+jne con5
+mov cl,[PageNumber]
+and ecx,0xFF
+mov edi,[limits+ecx*4]
+mov [boundedBy],edi
+CTRLA:
+cmp byte[edi],0
+je OVERCOME
+or byte[edi+1],0x30 ; 0011 0000
+OVERCOME:
+add edi,2   
+mov ebp,[limits+ecx*4]  
+add ebp,0xFA0        
+cmp edi,ebp
+jle CTRLA
+LP_1:
+sub edi,2
+cmp byte[edi-2],0
+je LP_1
+mov [boundedBy+4],edi
+or byte[STATUS],0x04 ; set shaded status
+jmp checkAgain
+con5:
+cmp al,0x2C ; Z
+jne con6
+mov cl,[PageNumber]
+and ecx,0xFF
+mov edi,[limits+ecx*4]
+mov [boundedBy],edi
+add edi,0xFA0
+mov [boundedBy+4],edi
+mov ecx,25*80
+mov [length],ecx
+xor ecx,ecx
+mov esi,[boundedBy]
+AD1_:
+mov ax,[PREVIOUS_STATUS + ecx*2] ; 
+mov [esi+ecx*2],ax
+inc ecx
+cmp ecx,[length]
+jl AD1_
+LP_2:
+sub edi,2
+cmp byte[edi-2],0
+je LP_2
+jmp checkAgain
+con6:
+cmp al,0x1F ; S
+jne checkAgain
+push edi
+mov cl,[PageNumber]
+and ecx,0xFF
+mov edi,[limits+ecx*4]
+mov [boundedBy],edi
+add edi,0xFA0
+mov [boundedBy+4],edi
+mov ecx,25*80
+mov [length],ecx
+xor ecx,ecx
+mov esi,[boundedBy]
+AD_:
+mov ax,[esi+ecx*2]
+mov [PREVIOUS_STATUS + ecx*2],ax
+inc ecx
+cmp ecx,[length]
+jl AD_
+pop edi
+jmp checkAgain
+;;
+SHI:
 xlat
 test byte[STATUS],0x02 ; CapsLock
 jz print
@@ -795,8 +856,33 @@ in al,0x60
 LEFTSH:
 cmp al,0x4B ; Left Arrow
 jne RIGHTSH
+test byte[STATUS],0x08
+jz norm2
+
+B_Loop:
+call LSH
+mov cl,[PageNumber]
+and ecx,0xFF
+cmp edi,[limits+ecx*4]
+je checkAgain
+mov cl,[PageNumber]
+and ecx,0xFF
+cmp edi,[limits+ecx*4]
+je checkAgain
+cmp byte[edi-2],0x20
+je checkAgain
+cmp byte[edi-2],','
+je checkAgain
+cmp byte[edi-2],';'
+je checkAgain
+cmp byte[edi-2],':'
+je checkAgain
+jmp B_Loop
+
+norm2:
 call LSH
 jmp checkAgain
+
 LSH:
 mov cl,[PageNumber]
 and ecx,0xFF
@@ -832,6 +918,24 @@ cmp al,0x4D ; Right Arrow
 jne UPSH
 ;cmp byte[edi],0
 ;je checkAgain
+test byte[STATUS],0x08
+jz norm3
+
+A_Loop:
+call RSH
+cmp byte[edi],0x20
+je checkAgain
+cmp byte[edi],','
+je checkAgain
+cmp byte[edi],';'
+je checkAgain
+cmp byte[edi],':'
+je checkAgain
+cmp byte[edi],0
+je checkAgain
+jmp A_Loop
+
+norm3:
 call RSH
 jmp checkAgain
 
