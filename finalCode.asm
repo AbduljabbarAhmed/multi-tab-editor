@@ -1058,7 +1058,7 @@ sub eax,ebp
 mov ecx,160
 xor edx,edx
 div ecx
-neg edx
+sub edx,160
 sub esi,edx
 add ebp,0xF00
 
