@@ -22,7 +22,19 @@ cli
 	mov ss , ax 
 	mov sp , 0xffff
         
-	xor ecx,ecx
+        call Barca
+        
+        cccd: ; press any key to start
+        in al,0x64
+        and al,0x01
+        jz cccd
+        in al,0x60
+        
+        mov ah,00h
+        mov al,0x03
+        int 0x10
+        
+        xor ecx,ecx
         JMBAK:
         mov edi, [address+ecx*4]
         mov esi,edi
@@ -30,7 +42,8 @@ cli
         add ebp,0xFA0
         SETNULL:
         mov byte[esi],0
-        mov byte[esi+1],0x0F
+        mov al,[font_color]
+        mov byte[esi+1],al
         add esi,2
         cmp esi,ebp
         jle SETNULL
@@ -39,7 +52,7 @@ cli
         inc ecx
         cmp ecx,8
         jl JMBAK
-        mov edi, [address] ; default is first page
+        mov edi, [address] ; default is first page 0xB8000
         mov bx,ScanCodeTable
 checkAgain:
 call SetCursor	
@@ -454,11 +467,12 @@ mov ecx,8
 LP_0:
 push ecx
 mov al,0x20 ; space
-mov ah,0x0F
+mov ah,[font_color]
 call Insert
 pop ecx
 loop LP_0
 jmp checkAgain
+
 ENTR:
 cmp al,0x1C ; enter
 jne NEXT2
@@ -467,7 +481,7 @@ push edi
 mov al,[PageNumber]
 and eax,0xFF
 mov edi,[limits+eax*4]
-add edi,0xE60 ; 24th line
+add edi,0xE60 ; 24th line(index = 23)
 
 LabelN:
 push edi
@@ -646,11 +660,14 @@ jmp print
 F_KEYS:
 cmp al,0x3B ; F1
 jl CHARS
-cmp al,0x42 ; F8
+cmp al,0x44 ; F10
 jg CHARS
+cmp al,0x42 ; F8
+jg checkAgain
 sub al,0x3B ; get page index
 call SetPage
 jmp checkAgain
+
 CHARS:
 
 cmp al,0x80
@@ -784,7 +801,7 @@ mov [edi],al
 add edi,2
 jmp checkAgain
 AMHB:
-mov ah,0x0F ; white
+mov ah,[font_color] ; 
 call Insert
 
 jmp checkAgain
@@ -904,6 +921,9 @@ mov [boundedBy],edi
 cmp edi,[boundedBy+4]
 jne VV
 VW:
+; ######################################################
+; #############
+call SetColor
 and byte[STATUS],0xFB ; reset
 jmp cdc
 VV:
@@ -916,8 +936,6 @@ ret
 RIGHTSH:
 cmp al,0x4D ; Right Arrow
 jne UPSH
-;cmp byte[edi],0
-;je checkAgain
 test byte[STATUS],0x08
 jz norm3
 
@@ -947,7 +965,9 @@ add ebp,0xFA0
 cmp edi,ebp
 je chec
 call SetColor
-add edi,2
+and byte[STATUS],0xFB
+call right
+or byte[STATUS],0x04
 cmp edi,[boundedBy+4]
 jge aasa
 mov [boundedBy],edi
@@ -1036,15 +1056,19 @@ jmp checkAgain
  jne COLR
  ret
  COLR:
-test byte[edi+1],0x30
+test byte[edi+1],0x30 
+;;; 0011 0000
 jnz unshade
+
 or byte[edi+1],0x30
 ret
+
+
 unshade:
 and byte[edi+1],0x0F
 ret
 
-Insert: ;AL in EDI
+Insert: ;AX in EDI
 
 mov ebp,edi
 mov dl,[edi]
@@ -1087,7 +1111,7 @@ sub edi,2
 cmp byte[edi-2],0x20
 jne asa
 mov AL,' '
-mov AH,0x0F
+mov AH,[font_color]
 call Insert
 jmp ther
 
@@ -1179,15 +1203,20 @@ ret
 
 
 changeColor:
+test byte[STATUS],0x04 ; shaded
+jnz cxcx
+mov [font_color],cl
+ret
+cxcx:
 mov eax,[boundedBy]
-oneMoreTime:
-
 or cl,0x30 ; 
+oneMoreTime:
 mov [eax+1],cl
 add eax,2
 cmp eax,[boundedBy+4]
 jl oneMoreTime
 ret
+
 SetPage:
 mov cl,[PageNumber]
 and ecx,0xFF
@@ -1197,11 +1226,12 @@ mov edi,[address+eax*4]
 mov [PageNumber],al
 mov ah,0x05
 int 0x10
+mov byte[font_color],0x0F
 ret
 
 SetCursor:
 push ebx
-mov eax,edi
+mov eax,edi ; edi 
 mov cl,[PageNumber]
 and ecx,0xFF
 sub eax,[limits+ecx*4]
@@ -1232,14 +1262,18 @@ mov [MyMemory + ecx*2],ax
 mov dl,[PageNumber]
 and edx,0xFF
 lea eax,[esi+ecx*2]
+
 sub eax,[limits+edx*4]
 mov ebp,0xA0
 xor edx,edx
 div ebp
 cmp edx,0x9e
 jne contm
+lea eax,[esi+ecx*2]
+cmp byte[eax],0
+jne contm
 mov al,0x13 ; newLine
-mov ah,0x0F
+mov ah,[font_color]
 inc ecx
 sub esi,2
 mov [MyMemory + ecx*2],ax
@@ -1286,10 +1320,83 @@ inc ecx
 cmp ecx,[length]
 jl AD2
 ret
+
+Barca:
+
+        mov ah,00h
+        mov al,0x13
+        int 0x10
+        
+        xor dx,dx
+        YL:
+        xor cx,cx
+        XL:
+        mov ah,0x0C
+        mov al,0x0F
+        int 0x10
+        inc cx
+        cmp cx,320
+        jl XL
+        inc dx
+        cmp dx,200
+        jl YL
+        
+        mov dx,30
+        YL1:
+        mov cx,30
+        XL1:
+        mov ah,0x0C
+        mov al,0x0A
+        int 0x10
+        inc cx
+        cmp cx,290
+        jl XL1
+        inc dx
+        cmp dx,60
+        jl YL1
+        
+        mov dx,60
+        YL2:
+        mov cx,30
+        XL2:
+        mov ah,0x0C
+        mov al,0x01
+        int 0x10
+        add cx,230
+        
+        mov ah,0x0C
+        mov al,0x04
+        int 0x10
+        
+        sub cx,230
+        inc cx
+        cmp cx,60
+        jl XL2
+        inc dx
+        cmp dx,140
+        jl YL2
+        
+        mov dx,140
+        YL3:
+        mov cx,30
+        XL3:
+        mov ah,0x0C
+        mov al,0x00
+        int 0x10
+        inc cx
+        cmp cx,290
+        jl XL3
+        inc dx
+        cmp dx,170
+        jl YL3
+        
+      ret
+
+
 PageNumber: db 0
 address: dd 0xB8000,0xB9000,0xBA000,0xBB000,0xBC000,0xBD000,0xBE000,0xBF000
 limits: dd 0xB8000,0xB9000,0xBA000,0xBB000,0xBC000,0xBD000,0xBE000,0xBF000
-enttr: db 0
+font_color: db 0x0F ;white
 ScanCodeTable:   db "//1234567890-=//qwertyuiop[]//asdfghjkl;'`/\zxcvbnm,.//// /"
 ScanCodeTableSH: db '//!@#$%^&*()_+//QWERTYUIOP{}//ASDFGHJKL:"~/|ZXCVBNM<>?/// /' 
 STATUS: db 0 ; X _ X _ X _ ALT _ CTRL _ SHADED _ CapsL _ NumL 
